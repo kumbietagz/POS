@@ -1,0 +1,27 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "target": "es2020",  // Make sure this matches the latest ES version you're comfortable with
+    "module": "esnext",  // This ensures dynamic imports are supported
+    
+    "jsx": "react-native",  // Since you're working with React Native
+    "allowSyntheticDefaultImports": true,  // Enables default imports
+    "moduleResolution": "node",  // Makes sure module resolution works correctly
+    "esModuleInterop": true,  // Ensures compatibility with CommonJS modules
+    "skipLibCheck": true,  // Speeds up type checking by skipping library checks
+    "forceConsistentCasingInFileNames": true,
+  
+    "strict": true,
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
+}
