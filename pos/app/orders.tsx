@@ -1,425 +1,345 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Feather } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import {
-  KeyboardAvoidingView,
-  TouchableWithoutFeedback,
-  View,
-  Text,
-  TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
-  FlatList,
+  Text,
+  View,
   TextInput,
-  ListRenderItem,
-  Keyboard,
-  Animated,
-  useWindowDimensions,
+  TouchableOpacity,
+  ViewStyle,
+  Platform,
+  StatusBar,
+  Dimensions,
+  KeyboardAvoidingView,
+  ScrollView,
+  FlatList,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import {
   useFonts,
   Poppins_400Regular,
   Poppins_600SemiBold,
   Poppins_700Bold,
 } from '@expo-google-fonts/poppins';
-import { Feather } from '@expo/vector-icons';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import DropDownPicker from 'react-native-dropdown-picker';
+import { ScaledSheet, scale, moderateScale, verticalScale } from 'react-native-size-matters';
+import { useMediaQuery } from 'react-responsive';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import BottomTabs from './bottomtabs'
 
+// Color constants
 const PRIMARY_COLOR = '#ECDAC3';
 const SECONDARY_COLOR = '#B38B6D';
 const TEXT_COLOR = '#403D39';
 const ICON_COLOR = TEXT_COLOR;
-const BUTTON_COLOR = SECONDARY_COLOR;
-const BUTTON_TEXT_COLOR = '#FFFFFF';
+const INPUT_BG = '#F3EAE3';
+const WHITE = '#FFFFFF';
+const DELETE_COLOR = '#FF6B6B';
+const FILTER_ICON_COLOR = SECONDARY_COLOR;
 
 interface Order {
   id: string;
-  date: Date;
+  date: string;
   status: string;
   paymentMethod: string;
   total: string;
 }
 
 const OrderListingScreen: React.FC = () => {
-  const { width, height } = useWindowDimensions();
-  const isLandscape = width > height;
-
   let [fontsLoaded] = useFonts({
     Poppins_400Regular,
     Poppins_600SemiBold,
     Poppins_700Bold,
   });
 
-  const [searchActive, setSearchActive] = useState(false);
-  const [searchText, setSearchText] = useState('');
+  const insets = useSafeAreaInsets();
+  const [statusBarHeight, setStatusBarHeight] = useState(0);
+  const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
+  const [screenHeight, setScreenHeight] = useState(Dimensions.get('window').height);
+
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      setStatusBarHeight(StatusBar.currentHeight || 0);
+    }
+
+    const updateLayout = () => {
+      setScreenWidth(Dimensions.get('window').width);
+      setScreenHeight(Dimensions.get('window').height);
+    };
+
+    const subscription = Dimensions.addEventListener('change', updateLayout);
+
+    return () => subscription.remove();
+  }, []);
+
+  const isTabletOrMobileDevice = useMediaQuery({ maxWidth: 1224 });
+  const isDesktop = useMediaQuery({ minWidth: 1224 });
+
+  const getResponsiveFontSize = (baseSize: number) => {
+    if (isDesktop) return baseSize * 0.7;
+    if (isTabletOrMobileDevice) return baseSize * 0.85;
+    return baseSize;
+  };
+
+  const [orders, setOrders] = useState<Order[]>([
+    { id: '1001', date: '2023-05-01', status: 'Completed', paymentMethod: 'Credit Card', total: '$199.99' },
+    { id: '1002', date: '2023-05-02', status: 'Processing', paymentMethod: 'PayPal', total: '$149.50' },
+    { id: '1003', date: '2023-05-03', status: 'Shipped', paymentMethod: 'Cash', total: '$299.99' },
+    { id: '1004', date: '2023-05-04', status: 'Cancelled', paymentMethod: 'Credit Card', total: '$89.99' },
+    { id: '1005', date: '2023-05-05', status: 'Completed', paymentMethod: 'EcoCash', total: '$249.99' },
+  ]);
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterVisible, setFilterVisible] = useState(false);
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(new Date());
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
-  const [statusOpen, setStatusOpen] = useState(false);
-  const [statusValue, setStatusValue] = useState<string | null>(null);
-  const [statusItems, setStatusItems] = useState([
-    { label: 'Completed', value: 'completed' },
-    { label: 'Processing', value: 'processing' },
-    { label: 'Shipped', value: 'shipped' },
-    { label: 'Cancelled', value: 'cancelled' },
-  ]);
-  const [paymentMethodOpen, setPaymentMethodOpen] = useState(false);
-  const [paymentMethodValue, setPaymentMethodValue] = useState<string | null>(null);
-  const [paymentMethodItems, setPaymentMethodItems] = useState([
-    { label: 'Credit Card', value: 'credit_card' },
-    { label: 'PayPal', value: 'paypal' },
-    { label: 'Cash', value: 'cash' },
-    { label: 'EcoCash', value: 'ecocash' },
-  ]);
 
-  // Animation references
-  const searchAnimation = useRef(new Animated.Value(0)).current;
-  const searchInputRef = useRef<TextInput>(null);
-  const headerTextOpacity = useRef(new Animated.Value(1)).current;
-
-  const orders: Order[] = [
-    { id: '1001', date: new Date('2023-05-01'), status: 'Completed', paymentMethod: 'Credit Card', total: '$199.99' },
-    { id: '1002', date: new Date('2023-05-02'), status: 'Processing', paymentMethod: 'PayPal', total: '$149.50' },
-    { id: '1003', date: new Date('2023-05-03'), status: 'Shipped', paymentMethod: 'Cash', total: '$299.99' },
-    { id: '1004', date: new Date('2023-05-04'), status: 'Cancelled', paymentMethod: 'Credit Card', total: '$89.99' },
-    { id: '1005', date: new Date('2023-05-05'), status: 'Completed', paymentMethod: 'EcoCash', total: '$249.99' },
-    { id: '1006', date: new Date('2023-05-06'), status: 'Processing', paymentMethod: 'PayPal', total: '$179.99' },
-    { id: '1007', date: new Date('2023-05-07'), status: 'Shipped', paymentMethod: 'Credit Card', total: '$129.99' },
-    { id: '1008', date: new Date('2023-05-08'), status: 'Completed', paymentMethod: 'Cash', total: '$219.99' },
-  ];
-
-  if (!fontsLoaded) {
-    return null;
-  }
-
-  const toggleSearch = () => {
-    setSearchActive(!searchActive);
-    Animated.parallel([
-      Animated.timing(searchAnimation, {
-        toValue: searchActive ? 0 : 1,
-        duration: 300,
-        useNativeDriver: false,
-      }),
-      Animated.timing(headerTextOpacity, {
-        toValue: searchActive ? 1 : 0,
-        duration: 300,
-        useNativeDriver: false,
-      }),
-    ]).start();
-
-    if (!searchActive) {
-      setTimeout(() => searchInputRef.current?.focus(), 100);
-    } else {
-      setSearchText('');
-      Keyboard.dismiss();
-    }
-  };
+  const filteredOrders = orders.filter(order => {
+    const orderDate = new Date(order.date);
+    const matchesSearch = order.id.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilters.length === 0 || statusFilters.includes(order.status);
+    const matchesStartDate = !startDate || orderDate >= startDate;
+    const matchesEndDate = !endDate || orderDate <= endDate;
+    return matchesSearch && matchesStatus && matchesStartDate && matchesEndDate;
+  });
 
   const toggleFilter = () => {
     setFilterVisible(!filterVisible);
   };
 
-  const applyFilter = () => {
-    setFilterVisible(false);
-    console.log('Filters applied:', { startDate, endDate, statusValue, paymentMethodValue });
+  const applyFilter = (status: string) => {
+    setStatusFilters(prevFilters =>
+      prevFilters.includes(status)
+        ? prevFilters.filter(filter => filter !== status)
+        : [...prevFilters, status]
+    );
   };
 
-  const handleDateChange = (
-    setDateFunction: React.Dispatch<React.SetStateAction<Date>>,
-    setShowPickerFunction: React.Dispatch<React.SetStateAction<boolean>>
-  ) => (event: DateTimePickerEvent, selectedDate?: Date) => {
-    setShowPickerFunction(false);
+  const handleStartDateChange = (event: any, selectedDate?: Date) => {
+    setShowStartDatePicker(false);
     if (selectedDate) {
-      setDateFunction(selectedDate);
+      setStartDate(selectedDate);
     }
   };
 
-  const onStatusOpen = () => {
-    setPaymentMethodOpen(false);
+  const handleEndDateChange = (event: any, selectedDate?: Date) => {
+    setShowEndDatePicker(false);
+    if (selectedDate) {
+      setEndDate(selectedDate);
+    }
   };
 
-  const onPaymentMethodOpen = () => {
-    setStatusOpen(false);
-  };
-
-  const renderOrderItem: ListRenderItem<Order> = ({ item }) => (
-    <View style={styles({ width, height }).orderItem}>
-      <Text style={styles({ width, height }).orderId}>Order #{item.id}</Text>
-      <Text style={styles({ width, height }).orderDate}>{item.date.toLocaleDateString()}</Text>
-      <Text style={styles({ width, height }).orderStatus}>{item.status}</Text>
-      <Text style={styles({ width, height }).orderPayment}>{item.paymentMethod}</Text>
-      <Text style={styles({ width, height }).orderTotal}>{item.total}</Text>
+  const renderOrderItem = ({ item }: { item: Order }) => (
+    <View style={styles.orderItem}>
+      <View style={styles.orderInfo}>
+        <Text style={[styles.orderId, { fontSize: getResponsiveFontSize(18) }]}>Order #{item.id}</Text>
+        <Text style={[styles.orderDate, { fontSize: getResponsiveFontSize(14) }]}>Date: {item.date}</Text>
+        <Text style={[styles.orderStatus, { fontSize: getResponsiveFontSize(14) }]}>Status: {item.status}</Text>
+        <Text style={[styles.orderPayment, { fontSize: getResponsiveFontSize(14) }]}>Payment: {item.paymentMethod}</Text>
+        <Text style={[styles.orderTotal, { fontSize: getResponsiveFontSize(14) }]}>Total: {item.total}</Text>
+      </View>
     </View>
   );
 
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
-    <SafeAreaView style={styles({ width, height }).container}>
-      <View style={styles({ width, height }).header}>
-        <TouchableOpacity style={styles({ width, height }).iconButton}>
-          <Feather name="arrow-left" size={24} color={ICON_COLOR} />
+    <SafeAreaView style={styles.container}>
+      <View style={[
+        styles.header,
+        { paddingTop: Platform.OS === 'android' ? statusBarHeight : insets.top }
+      ]}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Feather name="arrow-left" size={getResponsiveFontSize(24)} color={ICON_COLOR} />
         </TouchableOpacity>
-        <Animated.Text style={[styles({ width, height }).headerText, { opacity: headerTextOpacity }]}>Orders</Animated.Text>
-        <View style={styles({ width, height }).headerRightIcons}>
-          <Animated.View style={[styles({ width, height }).searchContainer, { width: searchAnimation.interpolate({ inputRange: [0, 1], outputRange: [40, width * 0.65] as [number, number] }) }]}>
-            <TouchableOpacity onPress={toggleSearch}>
-              <Feather name="search" size={20} color={ICON_COLOR} />
-            </TouchableOpacity>
-            <Animated.View style={[styles({ width, height }).inputContainer, { opacity: searchAnimation }]}>
-              <TextInput
-                ref={searchInputRef}
-                style={styles({ width, height }).searchInput}
-                placeholder="Search order ID..."
-                placeholderTextColor={TEXT_COLOR}
-                value={searchText}
-                onChangeText={setSearchText}
-              />
-              <TouchableOpacity onPress={toggleSearch}>
-                <Feather name="x" size={20} color={ICON_COLOR} />
-              </TouchableOpacity>
-            </Animated.View>
-          </Animated.View>
-          <TouchableOpacity style={styles({ width, height }).iconButton} onPress={toggleFilter}>
-            <Feather name="filter" size={24} color={ICON_COLOR} />
-          </TouchableOpacity>
-        </View>
+        <Text style={[styles.headerText, { fontSize: getResponsiveFontSize(20) }]}>All Orders</Text>
+        <TouchableOpacity onPress={toggleFilter} style={styles.filterButton}>
+          <Ionicons name="filter-outline" size={getResponsiveFontSize(20)} color={TEXT_COLOR} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.searchContainer}>
+        <Ionicons name="search-outline" size={getResponsiveFontSize(20)} color={TEXT_COLOR} style={styles.searchIcon} />
+        <TextInput
+          style={[styles.searchInput, { fontSize: getResponsiveFontSize(16) }]}
+          placeholder="Search orders..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor={TEXT_COLOR}
+        />
       </View>
 
       {filterVisible && (
-        <View style={[styles({ width, height }).filterContainer, { zIndex: 2000 }]}>
-          <Text style={styles({ width, height }).filterTitle}>Filter Orders</Text>
-          <View style={styles({ width, height }).dateContainer}>
-            <TouchableOpacity style={styles({ width, height }).dateButton} onPress={() => setShowStartDatePicker(true)}>
-              <Text style={styles({ width, height }).dateButtonText}>Start Date: {startDate.toLocaleDateString()}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles({ width, height }).dateButton} onPress={() => setShowEndDatePicker(true)}>
-              <Text style={styles({ width, height }).dateButtonText}>End Date: {endDate.toLocaleDateString()}</Text>
-            </TouchableOpacity>
-          </View>
-          {showStartDatePicker && (
-            <DateTimePicker
-              value={startDate}
-              mode="date"
-              display="spinner"
-              onChange={handleDateChange(setStartDate, setShowStartDatePicker)}
-              textColor={TEXT_COLOR}
-              themeVariant="light"
-            />
-          )}
-          {showEndDatePicker && (
-            <DateTimePicker
-              value={endDate}
-              mode="date"
-              display="spinner"
-              onChange={handleDateChange(setEndDate, setShowEndDatePicker)}
-              textColor={TEXT_COLOR}
-              themeVariant="light"
-            />
-          )}
-
-          <View style={{ zIndex: 3000, marginBottom: 15 }}>
-            <DropDownPicker
-              open={statusOpen}
-              value={statusValue}
-              items={statusItems}
-              setOpen={setStatusOpen}
-              setValue={setStatusValue}
-              setItems={setStatusItems}
-              style={styles({ width, height }).dropdown}
-              dropDownContainerStyle={styles({ width, height }).dropdownList}
-              placeholder="Select status"
-              onOpen={onStatusOpen}
-              zIndex={3000}
-            />
-          </View>
-
-          <View style={{ zIndex: 2500 }}>
-            <DropDownPicker
-              open={paymentMethodOpen}
-              value={paymentMethodValue}
-              items={paymentMethodItems}
-              setOpen={setPaymentMethodOpen}
-              setValue={setPaymentMethodValue}
-              setItems={setPaymentMethodItems}
-              style={styles({ width, height }).dropdown}
-              dropDownContainerStyle={styles({ width, height }).dropdownList}
-              placeholder="Select payment method"
-              onOpen={onPaymentMethodOpen}
-              zIndex={2500}
-            />
-          </View>
-
-          <TouchableOpacity style={styles({ width, height }).applyFilterButton} onPress={applyFilter}>
-            <Text style={styles({ width, height }).applyFilterButtonText}>Apply Filters</Text>
+        <View style={[styles.filterContainer, { width: screenWidth * 0.9, maxWidth: 600 }]}>
+          <TouchableOpacity onPress={() => applyFilter('Completed')} style={styles.filterOption}>
+            <Text style={styles.filterText}>Completed</Text>
+            {statusFilters.includes('Completed') && <Ionicons name="checkmark" size={getResponsiveFontSize(20)} color={FILTER_ICON_COLOR} />}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => applyFilter('Processing')} style={styles.filterOption}>
+            <Text style={styles.filterText}>Processing</Text>
+            {statusFilters.includes('Processing') && <Ionicons name="checkmark" size={getResponsiveFontSize(20)} color={FILTER_ICON_COLOR} />}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => applyFilter('Shipped')} style={styles.filterOption}>
+            <Text style={styles.filterText}>Shipped</Text>
+            {statusFilters.includes('Shipped') && <Ionicons name="checkmark" size={getResponsiveFontSize(20)} color={FILTER_ICON_COLOR} />}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => applyFilter('Cancelled')} style={styles.filterOption}>
+            <Text style={styles.filterText}>Cancelled</Text>
+            {statusFilters.includes('Cancelled') && <Ionicons name="checkmark" size={getResponsiveFontSize(20)} color={FILTER_ICON_COLOR} />}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowStartDatePicker(true)} style={styles.filterOption}>
+            <Text style={styles.filterText}>Start Date: {startDate ? startDate.toLocaleDateString() : 'Not set'}</Text>
+            {startDate && <Ionicons name="calendar-outline" size={getResponsiveFontSize(20)} color={FILTER_ICON_COLOR} />}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowEndDatePicker(true)} style={styles.filterOption}>
+            <Text style={styles.filterText}>End Date: {endDate ? endDate.toLocaleDateString() : 'Not set'}</Text>
+            {endDate && <Ionicons name="calendar-outline" size={getResponsiveFontSize(20)} color={FILTER_ICON_COLOR} />}
           </TouchableOpacity>
         </View>
       )}
 
-      <KeyboardAvoidingView behavior="height" style={{ flex: 1 }}>
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <FlatList<Order>
-            data={orders}
-            renderItem={renderOrderItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles({ width, height }).orderList}
-            style={{ flex: 1 }}
-          />
-        </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
+      {showStartDatePicker && (
+        <DateTimePicker
+          value={startDate || new Date()}
+          mode="date"
+          display="default"
+          onChange={handleStartDateChange}
+          textColor={TEXT_COLOR}
+          accentColor={SECONDARY_COLOR}
+        />
+      )}
+
+      {showEndDatePicker && (
+        <DateTimePicker
+          value={endDate || new Date()}
+          mode="date"
+          display="default"
+          onChange={handleEndDateChange}
+          textColor={TEXT_COLOR}
+          accentColor={SECONDARY_COLOR}
+        />
+      )}
+
+      <FlatList
+        data={filteredOrders}
+        renderItem={renderOrderItem}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.listContentContainer}
+      />
+      {/* Bottom Navigation */}
+      <BottomTabs />
     </SafeAreaView>
   );
 };
 
-const styles = ({ width, height }: { width: number; height: number }) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: PRIMARY_COLOR,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: width * 0.05,
-      justifyContent: 'space-between',
-    },
-    iconButton: {
-      marginHorizontal: width * 0.01,
-    },
-    headerText: {
-      fontFamily: 'Poppins_700Bold',
-      fontSize: width > height ? width * 0.035 : width * 0.05,
-      color: TEXT_COLOR,
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      textAlign: 'center',
-    },
-    headerRightIcons: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    searchContainer: {
-      height: 40,
-      backgroundColor: '#FFFFFF',
-      borderRadius: 20,
-      marginRight: '1%',
-      overflow: 'hidden',
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 10,
-    },
-    inputContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flex: 1,
-    },
-    searchInput: {
-      flex: 1,
-      fontFamily: 'Poppins_400Regular',
-      fontSize: width > height ? width * 0.035 : width * 0.05,
-      color: TEXT_COLOR,
-      marginRight: 10,
-    },
-    filterContainer: {
-      backgroundColor: '#FFFFFF',
-      padding: width * 0.05,
-      margin: width * 0.05,
-      borderRadius: width * 0.01,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: Math.round(width * 0.005) },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    },
-    filterTitle: {
-      fontFamily: 'Poppins_600SemiBold',
-      fontSize: width * 0.04,
-      color: TEXT_COLOR,
-      marginBottom: width * 0.03,
-    },
-    dateContainer: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: width * 0.03,
-    },
-    dateButton: {
-      backgroundColor: PRIMARY_COLOR,
-      padding: '2%',
-      borderRadius: width * 0.01,
-      flex: 0.48,
-    },
-    dateButtonText: {
-      fontFamily: 'Poppins_400Regular',
-      fontSize: width * 0.04,
-      color: TEXT_COLOR,
-      textAlign: 'center',
-    },
-    dropdownContainer: {
-      marginBottom: width * 0.03,
-    },
-    dropdown: {
-      backgroundColor: PRIMARY_COLOR,
-      borderColor: SECONDARY_COLOR,
-      borderRadius: width * 0.01,
-    },
-    dropdownList: {
-      backgroundColor: PRIMARY_COLOR,
-      borderColor: SECONDARY_COLOR,
-      maxHeight: 150,
-    },
-    applyFilterButton: {
-      backgroundColor: BUTTON_COLOR,
-      padding: '3%',
-      borderRadius: width * 0.01,
-      alignItems: 'center',
-      marginTop: '2%',
-    },
-    applyFilterButtonText: {
-      fontFamily: 'Poppins_600SemiBold',
-      fontSize: width * 0.04,
-      color: BUTTON_TEXT_COLOR,
-    },
-    orderList: {
-      paddingHorizontal: '5%',
-      paddingBottom: '20%',
-    },
-    orderItem: {
-      backgroundColor: '#FFFFFF',
-      borderRadius: width * 0.01,
-      padding: '4%',
-      marginBottom: '4%',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    },
-    orderId: {
-      fontFamily: 'Poppins_600SemiBold',
-      fontSize: width * 0.04,
-      color: TEXT_COLOR,
-    },
-    orderDate: {
-      fontFamily: 'Poppins_400Regular',
-      fontSize: width * 0.04,
-      color: TEXT_COLOR,
-    },
-    orderStatus: {
-      fontFamily: 'Poppins_400Regular',
-      fontSize: width * 0.04,
-      color: SECONDARY_COLOR,
-    },
-    orderPayment: {
-      fontFamily: 'Poppins_400Regular',
-      fontSize: width * 0.04,
-      color: TEXT_COLOR,
-    },
-    orderTotal: {
-      fontFamily: 'Poppins_600SemiBold',
-      fontSize: width * 0.04,
-      color: SECONDARY_COLOR,
-      marginTop: '2%',
-    },
-  });
+const styles = ScaledSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: PRIMARY_COLOR,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: '5%',
+    paddingVertical: '2%',
+    backgroundColor: PRIMARY_COLOR,
+    zIndex: 1,
+  },
+  headerText: {
+    fontFamily: 'Poppins_700Bold',
+    color: TEXT_COLOR,
+  },
+  filterButton: {
+    padding: scale(10),
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: INPUT_BG,
+    borderRadius: moderateScale(10),
+    paddingHorizontal: scale(10),
+    marginHorizontal: scale(20),
+    marginBottom: verticalScale(20),
+  },
+  searchIcon: {
+    marginRight: scale(10),
+  },
+  searchInput: {
+    flex: 1,
+    height: verticalScale(40),
+    color: TEXT_COLOR,
+    fontFamily: 'Poppins_400Regular',
+  },
+  filterContainer: {
+    backgroundColor: WHITE,
+    padding: scale(10),
+    marginHorizontal: scale(20),
+    borderRadius: moderateScale(10),
+    marginBottom: verticalScale(10),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  filterOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: verticalScale(10),
+    paddingHorizontal: scale(10),
+  },
+  filterText: {
+    fontFamily: 'Poppins_400Regular',
+    color: TEXT_COLOR,
+    fontSize: moderateScale(16),
+  },
+  listContentContainer: {
+    paddingHorizontal: '5%',
+  },
+  orderItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: WHITE,
+    borderRadius: moderateScale(10),
+    padding: scale(15),
+    marginBottom: verticalScale(15),
+  },
+  orderInfo: {
+    flex: 1,
+  },
+  orderId: {
+    fontFamily: 'Poppins_600SemiBold',
+    color: TEXT_COLOR,
+    marginBottom: verticalScale(5),
+  },
+  orderDate: {
+    fontFamily: 'Poppins_400Regular',
+    color: TEXT_COLOR,
+  },
+  orderStatus: {
+    fontFamily: 'Poppins_400Regular',
+    color: TEXT_COLOR,
+  },
+  orderPayment: {
+    fontFamily: 'Poppins_400Regular',
+    color: TEXT_COLOR,
+  },
+  orderTotal: {
+    fontFamily: 'Poppins_600SemiBold',
+    color: TEXT_COLOR,
+    marginTop: verticalScale(5),
+  },
+  backButton: {
+    marginRight: '3%',
+  } as ViewStyle,
+});
 
 export default OrderListingScreen;

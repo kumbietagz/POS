@@ -19,7 +19,8 @@ import {
   import DropDownPicker from 'react-native-dropdown-picker';
   import { useMediaQuery } from 'react-responsive';
   import { useSafeAreaInsets } from 'react-native-safe-area-context';
-  
+  import BottomTabs from './bottomtabs'
+
   // Get the device dimensions for responsive design
   const { width, height } = Dimensions.get('window');
   
@@ -137,6 +138,8 @@ import {
             </View>
           </TouchableWithoutFeedback>
         </KeyboardAvoidingView>
+        {/* Bottom Navigation */}
+      <BottomTabs />
       </SafeAreaView>
     );
   };

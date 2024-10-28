@@ -1,11 +1,28 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, SafeAreaView, ScrollView } from 'react-native';
-import { useFonts, Poppins_400Regular, Poppins_600SemiBold, Poppins_700Bold } from '@expo-google-fonts/poppins';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  Platform,
+  StatusBar,
+  ViewStyle,
+  TextStyle,
+} from 'react-native';
+import {
+  useFonts,
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_700Bold,
+} from '@expo-google-fonts/poppins';
 import { Feather } from '@expo/vector-icons';
+import { ScaledSheet, scale, moderateScale, verticalScale } from 'react-native-size-matters';
+import { useMediaQuery } from 'react-responsive';
+import { router } from 'expo-router';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import BottomTabs from './bottomtabs'
 
-const { width, height } = Dimensions.get('window');
-
-// Defining color constants based on your theme
+// Color constants
 const PRIMARY_COLOR = '#ECDAC3';
 const SECONDARY_COLOR = '#B38B6D';
 const TEXT_COLOR = '#403D39';
@@ -13,15 +30,39 @@ const ICON_COLOR = TEXT_COLOR;
 const UNREAD_COLOR = '#FFE6C1';
 const BORDER_COLOR = '#D0B89E';
 
-const NotificationsScreen = () => {
+interface Notification {
+  id: number;
+  message: string;
+  isRead: boolean;
+}
+
+const Notifications: React.FC = () => {
   let [fontsLoaded] = useFonts({
     Poppins_400Regular,
-    Poppins_600SemiBold,
+    Poppins_500Medium,
     Poppins_700Bold,
   });
 
-  const [viewUnreadOnly, setViewUnreadOnly] = useState(false);
-  const notifications = [
+  const insets = useSafeAreaInsets();
+  const [statusBarHeight, setStatusBarHeight] = useState<number>(0);
+
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      setStatusBarHeight(StatusBar.currentHeight || 0);
+    }
+  }, []);
+
+  const isTabletOrMobileDevice = useMediaQuery({ maxWidth: 1224 });
+  const isDesktop = useMediaQuery({ minWidth: 1224 });
+  
+  const getResponsiveFontSize = (baseSize: number): number => {
+    if (isDesktop) return baseSize * 0.7;
+    if (isTabletOrMobileDevice) return baseSize * 0.85;
+    return baseSize;
+  };
+
+  const [viewUnreadOnly, setViewUnreadOnly] = useState<boolean>(false);
+  const notifications: Notification[] = [
     { id: 1, message: 'Your payment was successful!', isRead: true },
     { id: 2, message: 'New update available.', isRead: false },
     { id: 3, message: 'Your order has been shipped!', isRead: false },
@@ -36,13 +77,87 @@ const NotificationsScreen = () => {
     ? notifications.filter(notification => !notification.isRead)
     : notifications;
 
+  const styles = ScaledSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: PRIMARY_COLOR,
+    } as ViewStyle,
+    headerContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: '5%',
+      paddingVertical: '2%',
+      marginTop: Platform.OS === 'android' ? statusBarHeight : insets.top,
+    } as ViewStyle,
+    backButton: {
+      marginRight: '3%',
+    } as ViewStyle,
+    headerText: {
+      fontFamily: 'Poppins_700Bold',
+      color: TEXT_COLOR,
+      flex: 1,
+    } as TextStyle,
+    filterContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-evenly',
+      paddingVertical: verticalScale(10),
+    } as ViewStyle,
+    filterButton: {
+      paddingVertical: verticalScale(8),
+      paddingHorizontal: scale(15),
+      borderRadius: moderateScale(8),
+      borderWidth: 1,
+      borderColor: BORDER_COLOR,
+      backgroundColor: PRIMARY_COLOR,
+    } as ViewStyle,
+    activeFilterButton: {
+      backgroundColor: SECONDARY_COLOR,
+    } as ViewStyle,
+    filterButtonText: {
+      fontFamily: 'Poppins_500Medium',
+      color: TEXT_COLOR,
+    } as TextStyle,
+    activeFilterText: {
+      color: PRIMARY_COLOR,
+    } as TextStyle,
+    scrollContainer: {
+      flexGrow: 1,
+      paddingHorizontal: '5%',
+      paddingBottom: '10%',
+    } as ViewStyle,
+    tableRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: verticalScale(12),
+      paddingHorizontal: scale(12),
+      borderBottomWidth: 1,
+      borderBottomColor: BORDER_COLOR,
+      borderRadius: moderateScale(10),
+      backgroundColor: '#FFFFFF',
+      marginBottom: verticalScale(8),
+    } as ViewStyle,
+    lastTableRow: {
+      borderBottomWidth: 0,
+    } as ViewStyle,
+    statusCell: {
+      width: '10%',
+      alignItems: 'center',
+    } as ViewStyle,
+    messageCell: {
+      flex: 1,
+      fontFamily: 'Poppins_400Regular',
+      color: TEXT_COLOR,
+      marginLeft: '3%',
+    } as TextStyle,
+  });
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.headerContainer}>
-        <TouchableOpacity style={styles.backButton}>
-          <Feather name="arrow-left" size={24} color={ICON_COLOR} />
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Feather name="arrow-left" size={getResponsiveFontSize(24)} color={ICON_COLOR} />
         </TouchableOpacity>
-        <Text style={styles.headerText}>Notifications</Text>
+        <Text style={[styles.headerText, { fontSize: getResponsiveFontSize(20) }]}>Notifications</Text>
       </View>
 
       <View style={styles.filterContainer}>
@@ -50,17 +165,29 @@ const NotificationsScreen = () => {
           onPress={() => setViewUnreadOnly(false)}
           style={[styles.filterButton, !viewUnreadOnly && styles.activeFilterButton]}
         >
-          <Text style={styles.filterButtonText}>View All</Text>
+          <Text style={[
+            styles.filterButtonText,
+            !viewUnreadOnly && styles.activeFilterText,
+            { fontSize: getResponsiveFontSize(14) }
+          ]}>
+            View All
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => setViewUnreadOnly(true)}
           style={[styles.filterButton, viewUnreadOnly && styles.activeFilterButton]}
         >
-          <Text style={styles.filterButtonText}>Unread</Text>
+          <Text style={[
+            styles.filterButtonText,
+            viewUnreadOnly && styles.activeFilterText,
+            { fontSize: getResponsiveFontSize(14) }
+          ]}>
+            Unread
+          </Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.tableContainer}>
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {filteredNotifications.map((notification, index) => (
           <View
             key={notification.id}
@@ -71,82 +198,22 @@ const NotificationsScreen = () => {
             ]}
           >
             <View style={styles.statusCell}>
-              <Feather 
-                name={notification.isRead ? "check-circle" : "circle"} 
-                size={20} 
-                color={notification.isRead ? SECONDARY_COLOR : ICON_COLOR} 
+              <Feather
+                name={notification.isRead ? "check-circle" : "circle"}
+                size={getResponsiveFontSize(24)}
+                color={notification.isRead ? SECONDARY_COLOR : ICON_COLOR}
               />
             </View>
-            <Text style={styles.messageCell}>{notification.message}</Text>
+            <Text style={[styles.messageCell, { fontSize: getResponsiveFontSize(16) }]}>
+              {notification.message}
+            </Text>
           </View>
         ))}
       </ScrollView>
+      {/* Bottom Navigation */}
+      <BottomTabs />
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: PRIMARY_COLOR,
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: width * 0.05,
-  },
-  backButton: {
-    marginRight: width * 0.03,
-  },
-  headerText: {
-    fontFamily: 'Poppins_700Bold',
-    fontSize: width * 0.05,
-    color: TEXT_COLOR,
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    paddingVertical: width * 0.03,
-  },
-  filterButton: {
-    paddingVertical: width * 0.02,
-    paddingHorizontal: width * 0.05,
-    backgroundColor: PRIMARY_COLOR,
-    borderRadius: width * 0.02,
-  },
-  activeFilterButton: {
-    backgroundColor: SECONDARY_COLOR,
-  },
-  filterButtonText: {
-    fontFamily: 'Poppins_600SemiBold',
-    color: TEXT_COLOR,
-    fontSize: width * 0.04,
-  },
-  tableContainer: {
-    flex: 1,
-    marginHorizontal: width * 0.05,
-  },
-  tableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: width * 0.03,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER_COLOR,
-  },
-  lastTableRow: {
-    borderBottomWidth: 0,
-  },
-  statusCell: {
-    width: width * 0.1,
-    alignItems: 'center',
-  },
-  messageCell: {
-    flex: 1,
-    fontFamily: 'Poppins_400Regular',
-    fontSize: width * 0.04,
-    color: TEXT_COLOR,
-    marginLeft: width * 0.02,
-  },
-});
-
-export default NotificationsScreen;
+export default Notifications;

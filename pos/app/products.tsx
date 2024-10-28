@@ -1,325 +1,387 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Feather } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import {
-  View,
-  Text,
-  TouchableOpacity,
   StyleSheet,
-  Dimensions,
-  SafeAreaView,
-  FlatList,
-  Image,
+  Text,
+  View,
   TextInput,
-  ListRenderItem,
-  Keyboard,
-  TouchableWithoutFeedback,
-  Animated,
+  TouchableOpacity,
+  Modal,
+  Platform,
+  StatusBar,
+  Dimensions,
+  KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { KeyboardAwareFlatList } from 'react-native-keyboard-aware-scroll-view';
 import {
   useFonts,
   Poppins_400Regular,
   Poppins_600SemiBold,
   Poppins_700Bold,
 } from '@expo-google-fonts/poppins';
-import { Feather } from '@expo/vector-icons';
+import { ScaledSheet, scale, moderateScale, verticalScale } from 'react-native-size-matters';
+import { useMediaQuery } from 'react-responsive';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import BottomTabs from './bottomtabs'
 
-const { width } = Dimensions.get('window');
-
+// Color constants
 const PRIMARY_COLOR = '#ECDAC3';
 const SECONDARY_COLOR = '#B38B6D';
 const TEXT_COLOR = '#403D39';
 const ICON_COLOR = TEXT_COLOR;
-const BUTTON_COLOR = SECONDARY_COLOR;
-const BUTTON_TEXT_COLOR = '#FFFFFF';
+const INPUT_BG = '#F3EAE3';
+const WHITE = '#FFFFFF';
+const DELETE_COLOR = '#FF6B6B';
 
 interface Product {
   id: string;
   name: string;
-  price: string;
-  image: string;
+  price: number;
+  tax: number;
 }
 
-const ProductListingScreen: React.FC = () => {
+const AllProducts: React.FC = () => {
   let [fontsLoaded] = useFonts({
     Poppins_400Regular,
     Poppins_600SemiBold,
     Poppins_700Bold,
   });
 
-  const [isGridView, setIsGridView] = useState(true);
-  const [searchActive, setSearchActive] = useState(false);
-  const [searchText, setSearchText] = useState('');
-  const [filterVisible, setFilterVisible] = useState(false);
-  const searchAnimation = useRef(new Animated.Value(0)).current;
-  const searchInputRef = useRef<TextInput>(null);
+  const insets = useSafeAreaInsets();
+  const [statusBarHeight, setStatusBarHeight] = useState(0);
+  const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
+  const [screenHeight, setScreenHeight] = useState(Dimensions.get('window').height);
 
-  const products: Product[] = [
-    { id: '1', name: 'Classic Chair', price: '$199', image: 'https://via.placeholder.com/150' },
-    { id: '2', name: 'Modern Sofa', price: '$599', image: 'https://via.placeholder.com/150' },
-    { id: '3', name: 'Wooden Table', price: '$299', image: 'https://via.placeholder.com/150' },
-    { id: '4', name: 'Pendant Light', price: '$89', image: 'https://via.placeholder.com/150' },
-    { id: '5', name: 'Bookshelf', price: '$249', image: 'https://via.placeholder.com/150' },
-    { id: '6', name: 'Area Rug', price: '$159', image: 'https://via.placeholder.com/150' },
-  ];
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      setStatusBarHeight(StatusBar.currentHeight || 0);
+    }
+
+    const updateLayout = () => {
+      setScreenWidth(Dimensions.get('window').width);
+      setScreenHeight(Dimensions.get('window').height);
+    };
+
+    const subscription = Dimensions.addEventListener('change', updateLayout);
+
+    return () => subscription.remove();
+  }, []);
+
+  const isTabletOrMobileDevice = useMediaQuery({ maxWidth: 1224 });
+  const isDesktop = useMediaQuery({ minWidth: 1224 });
+  
+  const getResponsiveFontSize = (baseSize: number) => {
+    if (isDesktop) return baseSize * 0.7;
+    if (isTabletOrMobileDevice) return baseSize * 0.85;
+    return baseSize;
+  };
+
+  const [products, setProducts] = useState<Product[]>([
+    { id: '1', name: 'Product 1', price: 10.99, tax: 0.15 },
+    { id: '2', name: 'Product 2', price: 15.99, tax: 0.15 },
+    { id: '3', name: 'Product 3', price: 20.99, tax: 0.15 },
+  ]);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [modalVisible, setModalVisible] = useState<boolean>(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [newProduct, setNewProduct] = useState<Omit<Product, 'id'>>({ name: '', price: 0, tax: 0 });
+
+  const filteredProducts = products.filter(product =>
+    product.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const addProduct = () => {
+    if (newProduct.name && newProduct.price) {
+      setProducts([...products, { ...newProduct, id: Date.now().toString() }]);
+      setNewProduct({ name: '', price: 0, tax: 0 });
+      setModalVisible(false);
+    }
+  };
+
+  const deleteProduct = (id: string) => {
+    setProducts(products.filter(product => product.id !== id));
+  };
+
+  const editProduct = (product: Product) => {
+    setEditingProduct(product);
+    setNewProduct({ name: product.name, price: product.price, tax: product.tax });
+    setModalVisible(true);
+  };
+
+  const updateProduct = () => {
+    if (editingProduct) {
+      setProducts(products.map(product => 
+        product.id === editingProduct.id ? { ...product, ...newProduct, id: editingProduct.id } : product
+      ));
+      setModalVisible(false);
+      setEditingProduct(null);
+      setNewProduct({ name: '', price: 0, tax: 0 });
+    }
+  };
+
+  const renderProductItem = ({ item }: { item: Product }) => (
+    <View style={styles.productItem}>
+      <View style={styles.productInfo}>
+        <Text style={[styles.productName, { fontSize: getResponsiveFontSize(18) }]}>{item.name}</Text>
+        <Text style={[styles.productPrice, { fontSize: getResponsiveFontSize(14) }]}>Price: ${item.price.toFixed(2)}</Text>
+        <Text style={[styles.productTax, { fontSize: getResponsiveFontSize(14) }]}>Tax: {(item.tax * 100).toFixed(0)}%</Text>
+      </View>
+      <View style={styles.productActions}>
+        <TouchableOpacity onPress={() => editProduct(item)} style={styles.editButton}>
+          <Ionicons name="create-outline" size={getResponsiveFontSize(24)} color={SECONDARY_COLOR} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => deleteProduct(item.id)} style={styles.deleteButton}>
+          <Ionicons name="trash-outline" size={getResponsiveFontSize(24)} color={DELETE_COLOR} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   if (!fontsLoaded) {
     return null;
   }
 
-  const toggleSearch = () => {
-    setSearchActive(!searchActive);
-    Animated.timing(searchAnimation, {
-      toValue: searchActive ? 0 : 1,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-
-    if (!searchActive) {
-      setTimeout(() => searchInputRef.current?.focus(), 100);
-    } else {
-      setSearchText('');
-      Keyboard.dismiss();
-    }
-  };
-
-  const toggleFilter = () => {
-    setFilterVisible((prev) => !prev);
-  };
-
-  const applyFilter = (filterType: string) => {
-    setFilterVisible(false);
-    console.log(`Filter applied: ${filterType}`);
-    // Add filter logic here
-  };
-
-  const renderProductItem: ListRenderItem<Product> = ({ item }) => (
-    <View style={isGridView ? styles.gridItem : styles.listItem}>
-      <Image source={{ uri: item.image }} style={isGridView ? styles.gridImage : styles.listImage} />
-      <View style={isGridView ? styles.gridTextContainer : styles.listTextContainer}>
-        <Text style={styles.productName}>{item.name}</Text>
-        <Text style={styles.productPrice}>{item.price}</Text>
-      </View>
-    </View>
-  );
-
-  const searchWidth = searchAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [40, width * 0.65],
-  });
-
-  const searchOpacity = searchAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
-
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.iconButton}>
-            <Feather name="arrow-left" size={24} color={ICON_COLOR} />
-          </TouchableOpacity>
-          <Text style={styles.headerText}>Products</Text>
-          <View style={styles.headerRightIcons}>
-            <Animated.View style={[styles.searchContainer, { width: searchWidth }]}>
-              <TouchableOpacity onPress={toggleSearch}>
-                <Feather name="search" size={20} color={ICON_COLOR} />
-              </TouchableOpacity>
-              <Animated.View style={[styles.inputContainer, { opacity: searchOpacity }]}>
-                <TextInput
-                  ref={searchInputRef}
-                  style={styles.searchInput}
-                  placeholder="Search products..."
-                  placeholderTextColor={TEXT_COLOR}
-                  value={searchText}
-                  onChangeText={setSearchText}
-                />
-                <TouchableOpacity onPress={toggleSearch}>
-                  <Feather name="x" size={20} color={ICON_COLOR} />
+    <SafeAreaView style={styles.container}>
+      <View style={[
+        styles.header,
+        { paddingTop: Platform.OS === 'android' ? statusBarHeight : insets.top }
+      ]}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Feather name="arrow-left" size={getResponsiveFontSize(24)} color={ICON_COLOR} />
+        </TouchableOpacity>
+        <Text style={[styles.headerText, { fontSize: getResponsiveFontSize(20) }]}>All Products</Text>
+        <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.addButton}>
+          <Ionicons name="add-circle-outline" size={getResponsiveFontSize(28)} color={SECONDARY_COLOR} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.searchContainer}>
+        <Ionicons name="search-outline" size={getResponsiveFontSize(20)} color={TEXT_COLOR} style={styles.searchIcon} />
+        <TextInput
+          style={[styles.searchInput, { fontSize: getResponsiveFontSize(16) }]}
+          placeholder="Search products..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor={TEXT_COLOR}
+        />
+      </View>
+
+      <KeyboardAwareFlatList
+        data={filteredProducts}
+        renderItem={renderProductItem}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.listContentContainer}
+      />
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalContainer}
+        >
+          <ScrollView contentContainerStyle={styles.modalScrollView}>
+            <View style={[styles.modalContent, { width: screenWidth * 0.9, maxHeight: screenHeight * 0.8 }]}>
+              <Text style={[styles.modalTitle, { fontSize: getResponsiveFontSize(20) }]}>
+                {editingProduct ? 'Edit Product' : 'Add New Product'}
+              </Text>
+              <TextInput
+                style={[styles.input, { fontSize: getResponsiveFontSize(16) }]}
+                placeholder="Product Name"
+                value={newProduct.name}
+                onChangeText={(text) => setNewProduct({...newProduct, name: text})}
+              />
+              <TextInput
+                style={[styles.input, { fontSize: getResponsiveFontSize(16) }]}
+                placeholder="Price"
+                value={newProduct.price.toString()}
+                onChangeText={(text) => setNewProduct({...newProduct, price: parseFloat(text) || 0})}
+                keyboardType="numeric"
+              />
+              <TextInput
+                style={[styles.input, { fontSize: getResponsiveFontSize(16) }]}
+                placeholder="Tax (as decimal, e.g., 0.15 for 15%)"
+                value={newProduct.tax.toString()}
+                onChangeText={(text) => setNewProduct({...newProduct, tax: parseFloat(text) || 0})}
+                keyboardType="numeric"
+              />
+              <View style={styles.modalButtonsContainer}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.submitButton]} 
+                  onPress={editingProduct ? updateProduct : addProduct}
+                >
+                  <Text style={[styles.submitButtonText, { fontSize: getResponsiveFontSize(16) }]}>
+                    {editingProduct ? 'Update' : 'Add'} Product
+                  </Text>
                 </TouchableOpacity>
-              </Animated.View>
-            </Animated.View>
-            <TouchableOpacity style={styles.iconButton} onPress={toggleFilter}>
-              <Feather name="filter" size={24} color={ICON_COLOR} />
-            </TouchableOpacity>
-            {filterVisible && (
-              <View style={styles.dropdown}>
-                <TouchableOpacity onPress={() => applyFilter('Price Low to High')}>
-                  <Text style={styles.dropdownText}>Price Low to High</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => applyFilter('Price High to Low')}>
-                  <Text style={styles.dropdownText}>Price High to Low</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => applyFilter('Newest Arrivals')}>
-                  <Text style={styles.dropdownText}>Newest Arrivals</Text>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.cancelButton]} 
+                  onPress={() => {
+                    setModalVisible(false);
+                    setEditingProduct(null);
+                    setNewProduct({ name: '', price: 0, tax: 0 });
+                  }}
+                >
+                  <Text style={[styles.cancelButtonText, { fontSize: getResponsiveFontSize(16) }]}>Cancel</Text>
                 </TouchableOpacity>
               </View>
-            )}
-            <TouchableOpacity style={styles.iconButton} onPress={() => setIsGridView(!isGridView)}>
-              <Feather name={isGridView ? 'list' : 'grid'} size={24} color={ICON_COLOR} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <FlatList<Product>
-          data={products}
-          renderItem={renderProductItem}
-          keyExtractor={(item) => item.id}
-          numColumns={isGridView ? 2 : 1}
-          key={isGridView ? 'grid' : 'list'}
-          contentContainerStyle={styles.productList}
-        />
-
-        <TouchableOpacity style={styles.floatingButton} onPress={() => {}}>
-          <Feather name="plus" size={24} color={BUTTON_TEXT_COLOR} />
-        </TouchableOpacity>
-      </SafeAreaView>
-    </TouchableWithoutFeedback>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
+      <BottomTabs />
+      {/* Bottom Navigation */}
+      <BottomTabs />
+    </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const styles = ScaledSheet.create({
   container: {
     flex: 1,
     backgroundColor: PRIMARY_COLOR,
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: width * 0.05,
     justifyContent: 'space-between',
-  },
-  iconButton: {
-    marginHorizontal: width * 0.01,
+    alignItems: 'center',
+    paddingHorizontal: '5%',
+    paddingVertical: '2%',
+    backgroundColor: PRIMARY_COLOR,
+    zIndex: 1,
   },
   headerText: {
     fontFamily: 'Poppins_700Bold',
-    fontSize: width * 0.05,
     color: TEXT_COLOR,
-    flex: 1,
-    textAlign: 'center',
   },
-  headerRightIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    position: 'relative',
+  backButton: {
+    marginRight: '3%',
+  } ,
+  addButton: {
+    padding: scale(10),
   },
   searchContainer: {
-    height: 40,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    marginRight: width * 0.01,
-    overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
+    backgroundColor: INPUT_BG,
+    borderRadius: moderateScale(10),
+    paddingHorizontal: scale(10),
+    marginHorizontal: scale(20),
+    marginBottom: verticalScale(20),
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+  searchIcon: {
+    marginRight: scale(10),
   },
   searchInput: {
     flex: 1,
-    fontFamily: 'Poppins_400Regular',
-    fontSize: width * 0.04,
+    height: verticalScale(40),
     color: TEXT_COLOR,
-    marginRight: 10,
-  },
-  dropdown: {
-    position: 'absolute',
-    top: 40,
-    right: 40,
-    backgroundColor: '#FFFFFF',
-    padding: 10,
-    borderRadius: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-    zIndex: 1000,
-  },
-  dropdownText: {
     fontFamily: 'Poppins_400Regular',
-    fontSize: width * 0.04,
-    color: TEXT_COLOR,
-    paddingVertical: 5,
   },
-  productList: {
-    paddingHorizontal: width * 0.05,
-    paddingBottom: width * 0.2,
+  listContentContainer: {
+    paddingHorizontal: '5%',
   },
-  gridItem: {
-    flex: 1,
-    margin: width * 0.02,
-    backgroundColor: '#FFFFFF',
-    borderRadius: width * 0.02,
-    padding: width * 0.04,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  listItem: {
+  productItem: {
     flexDirection: 'row',
-    marginBottom: width * 0.04,
-    backgroundColor: '#FFFFFF',
-    borderRadius: width * 0.02,
-    padding: width * 0.04,
+    justifyContent: 'space-between',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: WHITE,
+    borderRadius: moderateScale(10),
+    padding: scale(15),
+    marginBottom: verticalScale(15),
   },
-  gridImage: {
-    width: width * 0.35,
-    height: width * 0.35,
-    marginBottom: width * 0.02,
-    borderRadius: width * 0.01,
-  },
-  listImage: {
-    width: width * 0.25,
-    height: width * 0.25,
-    marginRight: width * 0.04,
-    borderRadius: width * 0.01,
-  },
-  gridTextContainer: {
-    alignItems: 'center',
-  },
-  listTextContainer: {
+  productInfo: {
     flex: 1,
   },
   productName: {
     fontFamily: 'Poppins_600SemiBold',
-    fontSize: width * 0.04,
     color: TEXT_COLOR,
+    marginBottom: verticalScale(5),
   },
   productPrice: {
     fontFamily: 'Poppins_400Regular',
-    fontSize: width * 0.035,
-    color: SECONDARY_COLOR,
-    marginTop: width * 0.01,
+    color: TEXT_COLOR,
   },
-  floatingButton: {
-    position: 'absolute',
-    bottom: width * 0.1,
-    right: width * 0.05,
-    backgroundColor: BUTTON_COLOR,
-    width: width * 0.15,
-    height: width * 0.15,
-    borderRadius: width * 0.075,
-    alignItems: 'center',
+  productTax: {
+    fontFamily: 'Poppins_400Regular',
+    color: TEXT_COLOR,
+  },
+  productActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  editButton: {
+    padding: scale(10),
+    marginRight: scale(5),
+  },
+  deleteButton: {
+    padding: scale(10),
+    marginLeft: scale(5),
+  },
+  modalContainer: {
+    flex: 1,
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3.84,
-    elevation: 5,
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalScrollView: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: WHITE,
+    borderRadius: moderateScale(20),
+    padding: scale(20),
+  },
+  modalTitle: {
+    fontFamily: 'Poppins_700Bold',
+    color: TEXT_COLOR,
+    marginBottom: verticalScale(15),
+    textAlign: 'center',
+  },
+  input: {
+    backgroundColor: INPUT_BG,
+    borderRadius: moderateScale(10),
+    padding: scale(10),
+    marginBottom: verticalScale(15),
+    color: TEXT_COLOR,
+    fontFamily: 'Poppins_400Regular',
+  },
+  modalButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: verticalScale(15),
+  },
+  modalButton: {
+    flex: 1,
+    borderRadius: moderateScale(10),
+    padding: scale(15),
+    alignItems: 'center',
+  },
+  submitButton: {
+    backgroundColor: SECONDARY_COLOR,
+    marginRight: scale(5),
+  },
+  submitButtonText: {
+    color: WHITE,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  cancelButton: {
+    backgroundColor: DELETE_COLOR,
+    marginLeft: scale(5),
+  },
+  cancelButtonText: {
+    color: WHITE,
+    fontFamily: 'Poppins_600SemiBold',
   },
 });
 
-export default ProductListingScreen;
+export default AllProducts;

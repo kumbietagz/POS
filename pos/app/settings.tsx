@@ -19,6 +19,7 @@ import { ScaledSheet, scale, moderateScale, verticalScale } from 'react-native-s
 import { useMediaQuery } from 'react-responsive';
 import { router } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import BottomTabs from './bottomtabs'
 
 // Color constants
 const PRIMARY_COLOR = '#ECDAC3';
@@ -208,6 +209,8 @@ const SettingsTab: React.FC = () => {
           <Feather name="chevron-right" size={getResponsiveFontSize(24)} color={ICON_COLOR} />
         </TouchableOpacity>
       </ScrollView>
+      {/* Bottom Navigation */}
+      <BottomTabs />
     </SafeAreaView>
   );
 };

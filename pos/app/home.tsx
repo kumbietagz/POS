@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { ScaledSheet, scale, verticalScale, moderateScale } from 'react-native-size-matters';
-
+import BottomTabs from './bottomtabs'
 const { width, height } = Dimensions.get('window');
 
 // Defining color constants based on the theme
@@ -42,21 +42,21 @@ const LandingScreen = () => {
         <View style={styles.salesSummary}>
           <Text style={styles.sectionTitle}>Sales Summary</Text>
           <View style={styles.summaryCards}>
-            <View style={styles.summaryCard}>
+            <TouchableOpacity style={styles.summaryCard} onPress={() => router.push('/posfirst')}>
               <Ionicons name="cash-outline" size={scale(32)} color={SECONDARY_COLOR} />
               <Text style={styles.cardValue}>$12,345</Text>
               <Text style={styles.cardLabel}>Sales</Text>
-            </View>
-            <View style={styles.summaryCard}>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.summaryCard} onPress={() => router.push('/orders')}>
               <Ionicons name="cart-outline" size={scale(32)} color={SECONDARY_COLOR} onPress={() => router.push('/orders')} />
               <Text style={styles.cardValue}>28</Text>
               <Text style={styles.cardLabel}>Orders</Text>
-            </View>
-            <View style={styles.summaryCard}>
-              <Ionicons name="cube-outline" size={scale(32)} color={SECONDARY_COLOR} />
-              <Text style={styles.cardValue}>145</Text>
-              <Text style={styles.cardLabel}>Products</Text>
-            </View>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.summaryCard} onPress={() => router.push('/products')}>
+                <Ionicons name="cube-outline" size={scale(32)} color={SECONDARY_COLOR} />
+                <Text style={styles.cardValue}>145</Text>
+                <Text style={styles.cardLabel}>Products</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -87,17 +87,7 @@ const LandingScreen = () => {
       </ScrollView>
 
       {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="grid-outline" size={scale(28)} color={TEXT_COLOR} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="home-outline" size={scale(28)} color={TEXT_COLOR} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/settings')}>
-          <Ionicons name="settings-outline" size={scale(28)} color={TEXT_COLOR} />
-        </TouchableOpacity>
-      </View>
+      <BottomTabs />
     </SafeAreaView>
   );
 };
